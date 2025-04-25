@@ -15,3 +15,5 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::apiResource('orders', OrderController::class);
+Route::get('/orders/user/{user_id}', [OrderController::class, 'getOrdersByUser']);
+Route::get('/orders/product/{product_id}', [OrderController::class, 'getOrdersByProduct']);
