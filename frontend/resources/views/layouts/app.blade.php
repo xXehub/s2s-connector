@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config('app.name') }} - @yield('title', 'Dashboard')</title>
-    
+
     <!-- Tabler Core CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/css/tabler.min.css">
-    
+
     <!-- Tabler Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/tabler-icons.min.css">
-    
+
     @stack('styles')
 </head>
+
 <body>
     <div class="page">
         <!-- Sidebar -->
@@ -64,12 +66,13 @@
                 </div>
             </div>
         </aside>
-        
+
         <div class="page-wrapper">
             <!-- Header -->
             <header class="navbar navbar-expand-md navbar-light d-none d-lg-flex">
                 <div class="container-fluid">
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#navbar-menu">
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <div class="navbar-nav flex-row order-md-last">
@@ -98,7 +101,7 @@
                     </div>
                 </div>
             </header>
-            
+
             <!-- Page header -->
             <div class="page-header d-print-none">
                 <div class="container-fluid">
@@ -112,26 +115,26 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Page body -->
             <div class="page-body">
                 <div class="container-fluid">
-                    @if(session('success'))
+                    @if (session('success'))
                         <div class="alert alert-success">
                             {{ session('success') }}
                         </div>
                     @endif
-                    
-                    @if(session('error'))
+
+                    @if (session('error'))
                         <div class="alert alert-danger">
                             {{ session('error') }}
                         </div>
                     @endif
-                    
+
                     @yield('content')
                 </div>
             </div>
-            
+
             <!-- Footer -->
             <footer class="footer footer-transparent d-print-none">
                 <div class="container-fluid">
@@ -158,10 +161,11 @@
             </footer>
         </div>
     </div>
-    
+
     <!-- Tabler Core JS -->
     <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js"></script>
-    
+
     @stack('scripts')
 </body>
+
 </html>
