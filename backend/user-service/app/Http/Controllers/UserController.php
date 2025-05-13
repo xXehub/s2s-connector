@@ -41,17 +41,27 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user = User::findOrFail($id);
-        $validated = $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users,email,' . $id,
-        ]);
-
-        $user->update($validated);
+        $user = User::find($id);
+    if (!$user) {
         return response()->json([
-            'success' => true,
-            'data' => new UserResource($user)
-        ]);
+            'success' => false,
+            'message' => 'User not found'
+        ], 404);
+    }
+
+    $validated = $request->validate([
+        'name'  => 'sometimes|required|string',
+        'email' => 'sometimes|required|email|unique:users,email,' . $id,
+    ]);
+
+    $user->update($validated);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'User updated successfully',
+        'data' => new UserResource($user)
+    ]);
+    
     }
 
     public function destroy($id)
