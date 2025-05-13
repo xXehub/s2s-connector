@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  # User Service
+  user-service:
+    build:
+      context: ./user-service
+    container_name: user-service
+    ports:
+      - "8001:9000"
+    volumes:
+      - ./user-service:/var/www
+    depends_on:
+      - user-db
+      - redis
+    networks:
+      - app-network
+
+  # Order Service
+  order-service:
+    build:
+      context: ./order-service
+    container_name: order-service
+    ports:
+      - "8002:9000"
+    volumes:
+      - ./order-service:/var/www
+    depends_on:
+      - order-db
+      - redis
+    networks:
+      - app-network
+
+  # Product Service
+  product-service:
+    build:
+      context: ./product-service
+    container_name: product-service
+    ports:
+      - "8003:9000"
+    volumes:
+      - ./product-service:/var/www
+    depends_on:
+      - product-db
+      - redis
+    networks:
+      - app-network
+
+  # MySQL for User Service
+  user-db:
+    image: mysql:8.0
+    container_name: user-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: user_service_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - user-data:/var/lib/mysql
+    networks:
+      - app-network
+
+  # MySQL for Order Service
+  order-db:
+    image: mysql:8.0
+    container_name: order-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: order_service_db
+    ports:
+      - "3308:3306"
+    volumes:
+      - order-data:/var/lib/mysql
+    networks:
+      - app-network
+
+  # MySQL for Product Service
+  product-db:
+    image: mysql:8.0
+    container_name: product-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: product_service_db
+    ports:
+      - "3309:3306"
+    volumes:
+      - product-data:/var/lib/mysql
+    networks:
+      - app-network
+
+  # Redis
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  # phpMyAdmin untuk semua DB
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOSTS: user-db,order-db,product-db
+      PMA_USER: root
+      PMA_PASSWORD: root
+    depends_on:
+      - user-db
+      - order-db
+      - product-db
+    networks:
+      - app-network
+
+# Volumes and Network
+volumes:
+  user-data:
+  order-data:
+  product-data:
+
+networks:
+  app-network:
+    driver: bridge
