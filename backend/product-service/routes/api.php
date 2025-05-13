@@ -15,3 +15,5 @@ use App\Http\Controllers\ProductController;
 */
 
 Route::apiResource('products', ProductController::class);
+Route::patch('/products/{id}/reduce-stock', [ProductController::class, 'reduceStock']);
+

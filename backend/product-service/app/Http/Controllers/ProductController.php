@@ -75,4 +75,30 @@ class ProductController extends Controller
             'message' => 'Product deleted successfully'
         ]);
     }
+
+    public function reduceStock(Request $request, $id)
+{
+    $product = Product::find($id);
+    if (!$product) {
+        return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+    }
+
+    $validated = $request->validate([
+        'quantity' => 'required|integer|min:1'
+    ]);
+
+    if ($product->stock < $validated['quantity']) {
+        return response()->json(['success' => false, 'message' => 'Stock insufficient'], 400);
+    }
+
+    $product->stock -= $validated['quantity'];
+    $product->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Stock reduced successfully',
+        'data' => new ProductResource($product)
+    ]);
+}
+
 }
