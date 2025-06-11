@@ -15,6 +15,6 @@ class ProductSeeder extends Seeder
         Product::create(['name' => 'Mouse Wireless Logitech', 'price' => 400000, 'stock' => 35]);
         Product::create(['name' => 'Headset Razer', 'price' => 1200000, 'stock' => 18]);
 
-        Product::factory(5)->create(); 
+        // Product::factory(5)->create(); 
     }
 }

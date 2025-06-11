@@ -21,8 +21,6 @@ class UserSeeder extends Seeder
                 ['name' => $user['name']]    
             );
         }
-
-        // Tambahkan 10 user 
         User::factory()
             ->count(10)
             ->sequence(fn ($sequence) => ['email' => "user{$sequence->index}@example.com"])

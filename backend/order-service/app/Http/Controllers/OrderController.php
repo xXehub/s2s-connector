@@ -2,183 +2,178 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use App\Http\Resources\OrderResource;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use App\Models\Order;
 
 class OrderController extends Controller
 {
     public function index()
     {
-        return response()->json([
-            'success' => true,
-            'data' => OrderResource::collection(Order::all())
-        ]);
-    }
-
-    public function show($id)
-    {
-        $order = Order::find($id);
-        if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Order not found'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => new OrderResource($order)
-        ]);
-    }
-
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'user_id' => 'required|integer',
-            'product_id' => 'required|integer',
-            'quantity' => 'required|integer'
-        ]);
-
         try {
-            // Pakai nama container,
-            $userResponse = Http::timeout(5)->get("http://user-service:9000/api/users/{$validated['user_id']}");
-            if ($userResponse->status() !== 200) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found in user-service'
-                ], 404);
-            }
-            $user = $userResponse->json()['data'];
-
-            $productResponse = Http::timeout(5)->get("http://product-service:9000/api/products/{$validated['product_id']}");
-            if ($productResponse->status() !== 200) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Product not found in product-service'
-                ], 404);
-            }
-            $product = $productResponse->json()['data'];
-
-            if ($validated['quantity'] > $product['stock']) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Not enough stock for this product'
-                ], 400);
-            }
-
-            $order = Order::create([
-                'user_id'       => $validated['user_id'],
-                'product_id'    => $validated['product_id'],
-                'product_name'  => $product['name'],
-                'product_price' => $product['price'],
-                'quantity'      => $validated['quantity'],
-                'total_price'   => $product['price'] * $validated['quantity']
-            ]);
-
-            // Endpoint reduce stok harus PATCH
-            Http::timeout(5)->patch("http://product-service:9000/api/products/{$validated['product_id']}/reduce-stock", [
-                'quantity' => $validated['quantity']
-            ]);
-
+            $orders = Order::all();
             return response()->json([
-                'success' => true,
-                'message' => 'Order created successfully',
-                'data' => [
-                    'user_id' => $order->user_id,
-                    'user_name' => $user['name'],
-                    'product_id' => $order->product_id,
-                    'product_name' => $order->product_name,
-                    'price' => $order->product_price,
-                    'quantity' => $order->quantity,
-                    'total_price' => $order->total_price
-                ]
-            ], 201);
+                'status' => 'success',
+                'message' => 'List of orders retrieved successfully',
+                'data' => $orders
+            ]);
         } catch (\Exception $e) {
+            Log::error('Failed to get orders: ' . $e->getMessage());
             return response()->json([
-                'success' => false,
-                'message' => 'Order failed: ' . $e->getMessage()
+                'status' => 'error',
+                'message' => 'Failed to retrieve orders',
+                'data' => null
             ], 500);
         }
     }
 
-    public function update(Request $request, $id)
+    public function store(Request $request)
     {
-        $order = Order::find($id);
-        if (!$order) {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required|integer',
+            'product_id' => 'required|integer',
+            'product_quantity' => 'required|integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
             return response()->json([
-                'success' => false,
-                'message' => 'Order not found'
-            ], 404);
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+                'data' => null
+            ], 422);
         }
 
-        $validated = $request->validate([
-            'product_name' => 'sometimes|required|string',
-            'product_price' => 'sometimes|required|numeric',
-            'quantity' => 'sometimes|required|integer'
-        ]);
+        try {
+            Log::info("🛒 [ORDER-SERVICE] Creating new order", $request->all());
 
-        $order->update($validated);
+            // Get product info
+            $productServiceUrl = env('PRODUCT_SERVICE_URL', 'http://product-web') . "/api/products/{$request->product_id}";
+            $productResponse = Http::timeout(5)->get($productServiceUrl);
+            
+            if ($productResponse->failed()) {
+                Log::error("Product not found", ['product_id' => $request->product_id]);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Product not found',
+                    'data' => null
+                ], 404);
+            }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Order updated successfully',
-            'data' => new OrderResource($order)
-        ]);
+            $product = $productResponse->json('data');
+
+            // Check stock
+            if ($product['stock'] < $request->product_quantity) {
+                Log::warning("Insufficient stock", [
+                    'available' => $product['stock'],
+                    'requested' => $request->product_quantity
+                ]);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Insufficient stock. Available: {$product['stock']}, Requested: {$request->product_quantity}",
+                    'data' => null
+                ], 400);
+            }
+
+            // Create order with ALL required fields
+            $order = Order::create([
+                'user_id' => $request->user_id,
+                'product_id' => $request->product_id,
+                'product_name' => $product['name'],
+                'product_price' => $product['price'],
+                'quantity' => $request->product_quantity,
+                'total_price' => $product['price'] * $request->product_quantity,
+                'status' => 'pending'
+            ]);
+
+            Log::info("✅ [ORDER-SERVICE] Order created successfully", ['order_id' => $order->id]);
+
+            // DISPATCH SIMPLE JOB TO RABBITMQ
+            \App\Jobs\ReduceProductStock::dispatch(
+                $request->product_id,
+                $request->product_quantity
+            )->onQueue('product-stock-update');
+
+            Log::info("🐰 [ORDER-SERVICE] ReduceProductStock dispatched to RabbitMQ", [
+                'product_id' => $request->product_id,
+                'quantity' => $request->product_quantity
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Order created successfully! Stock will be reduced via RabbitMQ.',
+                'data' => $order
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error("Order creation failed", ['error' => $e->getMessage()]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Order creation failed: ' . $e->getMessage(),
+                'data' => null
+            ], 500);
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $order = Order::find($id);
+            
+            if (!$order) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Order not found',
+                    'data' => null
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Order found',
+                'data' => $order
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Failed to get order: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve order',
+                'data' => null
+            ], 500);
+        }
     }
 
     public function destroy($id)
     {
-        $order = Order::find($id);
-        if (!$order) {
+        try {
+            $order = Order::find($id);
+            
+            if (!$order) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Order not found',
+                    'data' => null
+                ], 404);
+            }
+
+            $order->delete();
+            
             return response()->json([
-                'success' => false,
-                'message' => 'Order not found'
-            ], 404);
-        }
+                'status' => 'success',
+                'message' => 'Order deleted successfully',
+                'data' => null
+            ]);
 
-        $order->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Order deleted successfully'
-        ]);
-    }
-
-    public function getOrdersByUser($user_id)
-    {
-        $orders = Order::where('user_id', $user_id)->get();
-
-        if ($orders->isEmpty()) {
+        } catch (\Exception $e) {
+            Log::error("Failed to delete order: " . $e->getMessage());
             return response()->json([
-                'success' => false,
-                'message' => 'No orders found for this user'
-            ], 404);
+                'status' => 'error',
+                'message' => 'Failed to delete order',
+                'data' => null
+            ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Order history fetched successfully',
-            'data' => OrderResource::collection($orders)
-        ]);
-    }
-
-    public function getOrdersByProduct($product_id)
-    {
-        $orders = Order::where('product_id', $product_id)->get();
-
-        if ($orders->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No orders found for this product'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Orders for this product fetched successfully',
-            'data' => OrderResource::collection($orders)
-        ]);
     }
 }

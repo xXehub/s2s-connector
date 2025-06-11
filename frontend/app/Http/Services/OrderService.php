@@ -3,6 +3,7 @@
 namespace App\Http\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class OrderService
 {
@@ -10,48 +11,156 @@ class OrderService
 
     public function __construct()
     {
-        $this->baseUrl = env('ORDER_SERVICE_URL');
+        $this->baseUrl = env('ORDER_SERVICE_URL', 'http://order-web') . '/api';
     }
 
     public function getAllOrders()
     {
-        $response = Http::get("{$this->baseUrl}/orders");
-        return $response->json();
+        try {
+            $response = Http::timeout(30)->get("{$this->baseUrl}/orders");
+            
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'data' => $response->json('data') ?? $response->json()
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Failed to fetch orders: ' . $response->status()
+            ];
+        } catch (\Exception $e) {
+            Log::error('OrderService getAllOrders error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage()
+            ];
+        }
     }
 
     public function getOrderById($id)
     {
-        $response = Http::get("{$this->baseUrl}/orders/{$id}");
-        return $response->json();
+        try {
+            $response = Http::timeout(30)->get("{$this->baseUrl}/orders/{$id}");
+            
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'data' => $response->json('data') ?? $response->json()
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Order not found'
+            ];
+        } catch (\Exception $e) {
+            Log::error('OrderService getOrderById error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage()
+            ];
+        }
     }
 
     public function createOrder($data)
     {
-        $response = Http::post("{$this->baseUrl}/orders", $data);
-        return $response->json();
-    }
-
-    public function updateOrder($id, $data)
-    {
-        $response = Http::put("{$this->baseUrl}/orders/{$id}", $data);
-        return $response->json();
+        try {
+            $response = Http::timeout(30)->post("{$this->baseUrl}/orders", $data);
+            
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'data' => $response->json('data') ?? $response->json()
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Failed to create order: ' . ($response->json('message') ?? $response->body())
+            ];
+        } catch (\Exception $e) {
+            Log::error('OrderService createOrder error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage()
+            ];
+        }
     }
 
     public function deleteOrder($id)
     {
-        $response = Http::delete("{$this->baseUrl}/orders/{$id}");
-        return $response->json();
+        try {
+            $response = Http::timeout(30)->delete("{$this->baseUrl}/orders/{$id}");
+            
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'message' => 'Order deleted successfully'
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Failed to delete order: ' . $response->body()
+            ];
+        } catch (\Exception $e) {
+            Log::error('OrderService deleteOrder error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage()
+            ];
+        }
     }
 
     public function getOrdersByUser($userId)
     {
-        $response = Http::get("{$this->baseUrl}/orders/user/{$userId}");
-        return $response->json();
+        try {
+            $response = Http::timeout(30)->get("{$this->baseUrl}/orders/user/{$userId}");
+            
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'data' => $response->json('data') ?? $response->json()
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Failed to fetch user orders: ' . $response->status()
+            ];
+        } catch (\Exception $e) {
+            Log::error('OrderService getOrdersByUser error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage()
+            ];
+        }
     }
 
     public function getOrdersByProduct($productId)
     {
-        $response = Http::get("{$this->baseUrl}/orders/product/{$productId}");
-        return $response->json();
+        try {
+            $response = Http::timeout(30)->get("{$this->baseUrl}/orders/product/{$productId}");
+            
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'data' => $response->json('data') ?? $response->json()
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Failed to fetch product orders: ' . $response->status()
+            ];
+        } catch (\Exception $e) {
+            Log::error('OrderService getOrdersByProduct error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Connection error: ' . $e->getMessage()
+            ];
+        }
     }
 }

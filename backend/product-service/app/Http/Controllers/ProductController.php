@@ -11,20 +11,28 @@ class ProductController extends Controller
 {
     public function index()
     {
-        $products = Product::all();
         return response()->json([
             'success' => true,
-            'data' => ProductResource::collection($products)
+            'data' => ProductResource::collection(Product::all())
         ]);
+    }
+
+    public function show($id)
+    {
+        $product = Product::find($id);
+        if (!$product) {
+            return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+        }
+
+        return response()->json(['success' => true, 'data' => new ProductResource($product)]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
+            'name' => 'required|string',
+            'price' => 'required|numeric',
+            'stock' => 'required|integer'
         ]);
 
         $product = Product::create($validated);
@@ -36,21 +44,15 @@ class ProductController extends Controller
         ], 201);
     }
 
-    public function show(Product $product)
+    public function update(Request $request, $id)
     {
-        return response()->json([
-            'success' => true,
-            'data' => new ProductResource($product)
-        ]);
-    }
+        $product = Product::find($id);
+        if (!$product) return response()->json(['success' => false, 'message' => 'Product not found'], 404);
 
-    public function update(Request $request, Product $product)
-    {
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'sometimes|required|numeric|min:0',
-            'stock' => 'sometimes|required|integer|min:0',
+            'name' => 'sometimes|string',
+            'price' => 'sometimes|numeric',
+            'stock' => 'sometimes|integer'
         ]);
 
         $product->update($validated);
@@ -62,8 +64,11 @@ class ProductController extends Controller
         ]);
     }
 
-    public function destroy(Product $product)
+    public function destroy($id)
     {
+        $product = Product::find($id);
+        if (!$product) return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+
         $product->delete();
 
         return response()->json([
@@ -72,49 +77,40 @@ class ProductController extends Controller
         ]);
     }
 
-    public function reduceStock(Request $request, Product $product)
+    public function reduceStock(Request $request, $id)
     {
-        $validated = $request->validate([
-            'quantity' => 'required|integer|min:1',
-            'order_id' => 'required|integer'
+        Log::info("Received reduce stock request for product {$id}", [
+            'request_data' => $request->all(),
+            'headers' => $request->headers->all()
         ]);
 
-        Log::info('Stock reduction request received', [
-            'product_id' => $product->id,
-            'current_stock' => $product->stock,
-            'requested_quantity' => $validated['quantity'],
-            'order_id' => $validated['order_id']
+        $product = Product::find($id);
+        if (!$product) {
+            Log::error("Product not found: {$id}");
+            return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1'
         ]);
+
+        Log::info("Current product stock: {$product->stock}, requested reduction: {$validated['quantity']}");
 
         if ($product->stock < $validated['quantity']) {
-            Log::warning('Insufficient stock for reduction', [
-                'product_id' => $product->id,
-                'available_stock' => $product->stock,
-                'requested_quantity' => $validated['quantity'],
-                'order_id' => $validated['order_id']
-            ]);
-
+            Log::error("Insufficient stock for product {$id}. Available: {$product->stock}, Requested: {$validated['quantity']}");
             return response()->json([
-                'success' => false,
-                'message' => 'Insufficient stock available',
-                'data' => [
-                    'available_stock' => $product->stock,
-                    'requested_quantity' => $validated['quantity']
-                ]
+                'success' => false, 
+                'message' => 'Stock insufficient',
+                'current_stock' => $product->stock,
+                'requested' => $validated['quantity']
             ], 400);
         }
 
         $oldStock = $product->stock;
-        $product->decrement('stock', $validated['quantity']);
-        $product->refresh();
+        $product->stock -= $validated['quantity'];
+        $product->save();
 
-        Log::info('Stock reduced successfully', [
-            'product_id' => $product->id,
-            'old_stock' => $oldStock,
-            'new_stock' => $product->stock,
-            'reduced_quantity' => $validated['quantity'],
-            'order_id' => $validated['order_id']
-        ]);
+        Log::info("Stock reduced successfully for product {$id}. Old stock: {$oldStock}, New stock: {$product->stock}");
 
         return response()->json([
             'success' => true,
