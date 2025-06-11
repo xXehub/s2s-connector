@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
 
@@ -14,6 +15,9 @@ use App\Http\Controllers\ProductController;
 |
 */
 
-Route::apiResource('products', ProductController::class);
-Route::patch('/products/{id}/reduce-stock', [ProductController::class, 'reduceStock']);
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});
 
+Route::apiResource('products', ProductController::class);
+Route::put('products/{product}/reduce-stock', [ProductController::class, 'reduceStock']);

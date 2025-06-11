@@ -26,9 +26,9 @@ class ProcessOrder implements ShouldQueue
     public function handle(): void
     {
         try {
-            // GUNAKAN NAMA SERVICE DOCKER, BUKAN localhost
-            $userServiceUrl = "http://user-service:9000/api/users/{$this->orderData['user_id']}";
-            $productServiceUrl = "http://product-service:9000/api/products/{$this->orderData['product_id']}";
+            // Use nginx service names for internal communication
+            $userServiceUrl = env('USER_SERVICE_URL', 'http://user-service-nginx') . "/api/users/{$this->orderData['user_id']}";
+            $productServiceUrl = env('PRODUCT_SERVICE_URL', 'http://product-service-nginx') . "/api/products/{$this->orderData['product_id']}";
 
             $userResponse = Http::timeout(5)->get($userServiceUrl);
             if ($userResponse->failed()) {
@@ -60,10 +60,11 @@ class ProcessOrder implements ShouldQueue
 
             Log::info("Order berhasil dibuat. ID: {$order->id}");
 
+            // Dispatch to RabbitMQ queue
             ReduceProductStock::dispatch(
                 $this->orderData['product_id'],
                 $this->orderData['quantity']
-            );
+            )->onQueue('product_queue');
         } catch (\Exception $e) {
             Log::error('Order processing failed: ' . $e->getMessage());
         }

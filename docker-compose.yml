@@ -1,52 +1,48 @@
 version: '3.8'
 
 services:
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - microservices-net
+
   # User Service
-  user-service:
-    build:
-      context: ./user-service
-    container_name: user-service
-    ports:
-      - "8001:9000"
+  user-app:
+    build: ./backend/user-service
+    container_name: user-service-app
     volumes:
-      - ./user-service:/var/www
-    depends_on:
-      - user-db
-      - redis
+      - ./backend/user-service:/var/www
     networks:
-      - app-network
+      - microservices-net
+    depends_on:
+      user-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
 
-  # Order Service
-  order-service:
-    build:
-      context: ./order-service
-    container_name: order-service
+  user-web:
+    image: nginx:stable-alpine
+    container_name: user-service-nginx
     ports:
-      - "8002:9000"
+      - "8001:80"
     volumes:
-      - ./order-service:/var/www
-    depends_on:
-      - order-db
-      - redis
+      - ./backend/user-service:/var/www
+      - ./backend/user-service/nginx/default.conf:/etc/nginx/conf.d/default.conf
     networks:
-      - app-network
-
-  # Product Service
-  product-service:
-    build:
-      context: ./product-service
-    container_name: product-service
-    ports:
-      - "8003:9000"
-    volumes:
-      - ./product-service:/var/www
+      - microservices-net
     depends_on:
-      - product-db
-      - redis
-    networks:
-      - app-network
+      - user-app
 
-  # MySQL for User Service
   user-db:
     image: mysql:8.0
     container_name: user-db
@@ -59,9 +55,40 @@ services:
     volumes:
       - user-data:/var/lib/mysql
     networks:
-      - app-network
+      - microservices-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  # MySQL for Order Service
+  # Order Service
+  order-app:
+    build: ./backend/order-service
+    container_name: order-service-app
+    volumes:
+      - ./backend/order-service:/var/www
+    networks:
+      - microservices-net
+    depends_on:
+      order-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  order-web:
+    image: nginx:stable-alpine
+    container_name: order-service-nginx
+    ports:
+      - "8002:80"
+    volumes:
+      - ./backend/order-service:/var/www
+      - ./backend/order-service/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - microservices-net
+    depends_on:
+      - order-app
+
   order-db:
     image: mysql:8.0
     container_name: order-db
@@ -74,9 +101,40 @@ services:
     volumes:
       - order-data:/var/lib/mysql
     networks:
-      - app-network
+      - microservices-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  # MySQL for Product Service
+  # Product Service
+  product-app:
+    build: ./backend/product-service
+    container_name: product-service-app
+    volumes:
+      - ./backend/product-service:/var/www
+    networks:
+      - microservices-net
+    depends_on:
+      product-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  product-web:
+    image: nginx:stable-alpine
+    container_name: product-service-nginx
+    ports:
+      - "8003:80"
+    volumes:
+      - ./backend/product-service:/var/www
+      - ./backend/product-service/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - microservices-net
+    depends_on:
+      - product-app
+
   product-db:
     image: mysql:8.0
     container_name: product-db
@@ -89,18 +147,36 @@ services:
     volumes:
       - product-data:/var/lib/mysql
     networks:
-      - app-network
+      - microservices-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  # Redis
-  redis:
-    image: redis:latest
-    container_name: redis
-    ports:
-      - "6379:6379"
+  # Frontend Service
+  frontend-app:
+    build: ./frontend
+    container_name: frontend-app
+    volumes:
+      - ./frontend:/var/www
     networks:
-      - app-network
+      - microservices-net
 
-  # phpMyAdmin untuk semua DB
+  frontend-web:
+    image: nginx:stable-alpine
+    container_name: frontend-nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./frontend:/var/www
+      - ./frontend/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - microservices-net
+    depends_on:
+      - frontend-app
+
+  # phpMyAdmin
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: phpmyadmin
@@ -116,14 +192,14 @@ services:
       - order-db
       - product-db
     networks:
-      - app-network
+      - microservices-net
 
-# Volumes and Network
 volumes:
   user-data:
   order-data:
   product-data:
+  rabbitmq_data:
 
 networks:
-  app-network:
+  microservices-net:
     driver: bridge

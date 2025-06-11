@@ -1,38 +1,47 @@
-# Gunakan image PHP + FPM
 FROM php:8.2-fpm
 
-# Install dependencies sistem
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
+    git \
+    curl \
     libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
+    libzip-dev \
     zip \
     unzip \
-    curl \
-    git \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip sockets
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set direktori kerja
+# Set working directory
 WORKDIR /var/www
 
-# Copy source code
-COPY . .
+# Copy existing application directory contents
+COPY . /var/www
 
-# Install dependency Laravel
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
 
-# Set permission Laravel
+# Set permissions
 RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www/storage
+    && chmod -R 755 /var/www \
+    && chmod -R 775 /var/www/storage \
+    && chmod -R 775 /var/www/bootstrap/cache
 
-# Expose port agar dapat diakses
+# Create .env file if it doesn't exist
+RUN if [ ! -f .env ]; then cp .env.example .env; fi
+
+# Generate application key if not exists
+RUN php artisan key:generate --no-interaction || true
+
+# Clear caches
+RUN php artisan config:clear || true \
+    && php artisan route:clear || true \
+    && php artisan view:clear || true \
+    && php artisan cache:clear || true
+
+# Expose port 9000 and start php-fpm server
 EXPOSE 9000
-
-# Jalankan Laravel menggunakan built-in server
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=9000"]
+CMD ["php-fpm"]

@@ -1,0 +1,44 @@
+FROM php:8.2-cli
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libzip-dev \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip sockets
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy application
+COPY . .
+
+# Fix composer issues - update lock file first
+RUN composer update --no-scripts --no-interaction
+
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Setup environment
+RUN cp .env.example .env 2>/dev/null || true
+
+# Setup supervisor
+COPY docker/supervisor/worker.conf /etc/supervisor/conf.d/worker.conf
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 storage bootstrap/cache
+
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]
