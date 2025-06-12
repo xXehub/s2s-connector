@@ -1,0 +1,43 @@
+version: '3.6'
+services:
+  # Hasura GraphQL Engine
+  graphql-engine:
+    image: hasura/graphql-engine:v2.25.0
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    restart: always
+    environment:
+      # Hasura metadata database
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/postgres
+      # Enable console
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      # Enable dev mode for detailed errors
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      # Admin secret for console access
+      HASURA_GRAPHQL_ADMIN_SECRET: "${HASURA_GRAPHQL_ADMIN_SECRET:-hasura-admin-secret}"
+      # Enable logs
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: "startup, http-log, webhook-log, websocket-log, query-log"
+
+  # Hasura Metadata Database
+  postgres:
+    image: postgres:15
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-postgres-db.sh:/docker-entrypoint-initdb.d/init-postgres-db.sh
+    environment:
+      POSTGRES_PASSWORD: postgrespassword
+      # Membuat database untuk masing-masing service
+      POSTGRES_MULTIPLE_DATABASES: "user_service_db,order_service_db,product_service_db"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

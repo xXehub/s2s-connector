@@ -103,7 +103,7 @@ class OrderController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Order created successfully! Stock will be reduced via RabbitMQ.',
+                'message' => 'Order created successfully!.',
                 'data' => $order
             ], 201);
 
@@ -146,6 +146,37 @@ class OrderController extends Controller
         }
     }
 
+    public function update(Request $request, $id)
+    {
+        try {
+            $order = Order::find($id);
+            
+            if (!$order) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Order not found',
+                    'data' => null
+                ], 404);
+            }
+
+            $order->update($request->all());
+            
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Order updated successfully',
+                'data' => $order
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Failed to update order: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update order',
+                'data' => null
+            ], 500);
+        }
+    }
+
     public function destroy($id)
     {
         try {
@@ -175,5 +206,88 @@ class OrderController extends Controller
                 'data' => null
             ], 500);
         }
+    }
+
+    // NEW METHOD: Get orders by user ID
+    public function getOrdersByUser($userId)
+    {
+        try {
+            Log::info("📋 [ORDER-SERVICE] Getting orders for user", ['user_id' => $userId]);
+
+            $orders = Order::where('user_id', $userId)
+                          ->orderBy('created_at', 'desc')
+                          ->get();
+
+            if ($orders->isEmpty()) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'No orders found for this user',
+                    'data' => []
+                ]);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Found {$orders->count()} orders for user {$userId}",
+                'data' => $orders
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Failed to get orders by user: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve orders for user',
+                'data' => null
+            ], 500);
+        }
+    }
+
+    // NEW METHOD: Get orders by product ID
+    public function getOrdersByProduct($productId)
+    {
+        try {
+            Log::info("📋 [ORDER-SERVICE] Getting orders for product", ['product_id' => $productId]);
+
+            $orders = Order::where('product_id', $productId)
+                          ->orderBy('created_at', 'desc')
+                          ->get();
+
+            if ($orders->isEmpty()) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'No orders found for this product',
+                    'data' => []
+                ]);
+            }
+
+            // Calculate total quantity sold
+            $totalQuantity = $orders->sum('quantity');
+            $totalRevenue = $orders->sum('total_price');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Found {$orders->count()} orders for product {$productId}",
+                'data' => $orders,
+                'summary' => [
+                    'total_orders' => $orders->count(),
+                    'total_quantity_sold' => $totalQuantity,
+                    'total_revenue' => $totalRevenue
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Failed to get orders by product: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve orders for product',
+                'data' => null
+            ], 500);
+        }
+    }
+
+    // ALIAS METHOD: For backward compatibility
+    public function getByUser($userId)
+    {
+        return $this->getOrdersByUser($userId);
     }
 }

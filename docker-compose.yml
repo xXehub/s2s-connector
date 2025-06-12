@@ -247,6 +247,7 @@ services:
       - USER_SERVICE_URL=http://user-web
       - PRODUCT_SERVICE_URL=http://product-web
       - ORDER_SERVICE_URL=http://order-web
+      - HASURA_GRAPHQL_URL=http://hasura:8080/v1/graphql
 
   frontend-web:
     image: nginx:stable-alpine
@@ -261,13 +262,66 @@ services:
     depends_on:
       - frontend-app
 
+  # Hasura GraphQL Engine
+  hasura:
+    image: hasura/graphql-engine:v2.25.0
+    container_name: hasura
+    ports:
+      - "8080:8080"
+    depends_on:
+      - hasura-postgres
+    restart: always
+    environment:
+      # Hasura metadata database
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://postgres:postgrespassword@hasura-postgres:5432/postgres
+      # Enable console
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      # Enable dev mode for detailed errors
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      # Admin secret for console access
+      HASURA_GRAPHQL_ADMIN_SECRET: "hasura-admin-secret"
+      # Enable logs
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: "startup, http-log, webhook-log, websocket-log, query-log"
+      # CORS configuration
+      HASURA_GRAPHQL_CORS_DOMAIN: "*"
+      # Database URLs for services
+      USER_DB_URL: "postgres://postgres:postgrespassword@hasura-postgres:5432/user_service_db"
+      ORDER_DB_URL: "postgres://postgres:postgrespassword@hasura-postgres:5432/order_service_db"
+      PRODUCT_DB_URL: "postgres://postgres:postgrespassword@hasura-postgres:5432/product_service_db"
+    volumes:
+      - ./hasura/cors-config.yaml:/etc/hasura/cors-config.yaml
+    networks:
+      - microservices-net
+
+  # Hasura Metadata Database
+  hasura-postgres:
+    image: postgres:15
+    container_name: hasura-postgres
+    restart: always
+    volumes:
+      - hasura-data:/var/lib/postgresql/data
+      - ./hasura/init-postgres-db.sh:/docker-entrypoint-initdb.d/init-postgres-db.sh
+    environment:
+      POSTGRES_PASSWORD: postgrespassword
+      # Membuat database untuk masing-masing service
+      POSTGRES_MULTIPLE_DATABASES: "user_service_db,order_service_db,product_service_db"
+    ports:
+      - "5432:5432"
+    networks:
+      - microservices-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # phpMyAdmin
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: phpmyadmin
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8090:80"
     environment:
       PMA_HOSTS: user-db,order-db,product-db
       PMA_USER: root
@@ -284,6 +338,7 @@ volumes:
   order-data:
   product-data:
   rabbitmq_data:
+  hasura-data:
 
 networks:
   microservices-net:

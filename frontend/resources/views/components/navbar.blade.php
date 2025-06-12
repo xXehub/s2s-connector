@@ -7,7 +7,7 @@
         </button>
         <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
             <a href="{{ route('dashboard') }}">
-                <img src="{{ asset('static/logo.webp') }}" width="110" height="32" alt="Tabler"
+                <img src="{{ asset('static/logosense.webp') }}" width="110" height="32" alt="Tabler"
                     class="navbar-brand-image" />
             </a>
         </h1>

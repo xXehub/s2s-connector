@@ -1,0 +1,31 @@
+# CORS Configuration for Hasura GraphQL Engine
+
+# Enable CORS for all domains
+enabled: true
+
+# Allow all domains to access the API
+corsDomain: "*"
+
+# Allow credentials (cookies, authorization headers, etc.)
+withCredentials: true
+
+# Allowed HTTP methods
+allowedMethods:
+  - GET
+  - POST
+  - PUT
+  - DELETE
+  - OPTIONS
+
+# Allowed HTTP headers
+allowedHeaders:
+  - Content-Type
+  - Authorization
+  - X-Hasura-Role
+  - X-Hasura-User-Id
+  - X-Hasura-Admin-Secret
+  - X-Hasura-Access-Key
+  - X-Hasura-Custom-Headers
+
+# Max age for CORS preflight requests (in seconds)
+maxAge: 1800

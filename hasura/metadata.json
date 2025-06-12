@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "sources": [
+    {
+      "name": "user_service",
+      "kind": "postgres",
+      "tables": [],
+      "configuration": {
+        "connection_info": {
+          "database_url": "${USER_DB_URL}",
+          "isolation_level": "read-committed",
+          "use_prepared_statements": false
+        }
+      }
+    },
+    {
+      "name": "order_service",
+      "kind": "postgres",
+      "tables": [],
+      "configuration": {
+        "connection_info": {
+          "database_url": "${ORDER_DB_URL}",
+          "isolation_level": "read-committed",
+          "use_prepared_statements": false
+        }
+      }
+    },
+    {
+      "name": "product_service",
+      "kind": "postgres",
+      "tables": [],
+      "configuration": {
+        "connection_info": {
+          "database_url": "${PRODUCT_DB_URL}",
+          "isolation_level": "read-committed",
+          "use_prepared_statements": false
+        }
+      }
+    }
+  ]
+}
